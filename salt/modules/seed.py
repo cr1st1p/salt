@@ -129,7 +129,7 @@ def apply_(path, id_=None, config=None, approve_key=True, install=True,
                  '{0}'.format(mpt))
         try:
             res = _install(mpt)
-        catch Exception e:
+        except Exception as e:
             log.error("Failed to install. {0}".format(e))
             res = False            
     elif prep_install:
