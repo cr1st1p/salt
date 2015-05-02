@@ -127,7 +127,11 @@ def apply_(path, id_=None, config=None, approve_key=True, install=True,
     elif install:
         log.info('attempting to install salt-minion to '
                  '{0}'.format(mpt))
-        res = _install(mpt)
+        try:
+            res = _install(mpt)
+        catch Exception e:
+            log.error("Failed to install. {0}".format(e))
+            res = False            
     elif prep_install:
         log.error('The prep_install option is no longer supported. Please use '
                   'the bootstrap script installed with Salt, located at {0}.'
@@ -195,6 +199,22 @@ def mkconfig(config=None, tmp=None, id_=None, approve_key=True,
     return {'config': tmp_config, 'pubkey': pubkeyfn, 'privkey': privkeyfn}
 
 
+def prep_bootstrap_for_chroot_(mpt, bootscript_location):
+    '''
+    Copy the bootscript into a location accessible after doing a chroot.
+    Try to make the location not easy to figure out - security reasons.
+    '''
+    fpd_ = os.path.join(mpt, 'tmp', "{0}".format(
+        uuid.uuid4()))
+    if not os.path.exists(fpd_):
+        os.makedirs(fpd_)
+    os.chmod(fpd_, 0o700)
+    fp_ = os.path.join(fpd_, os.path.basename(bootscript_location))
+    # Copy script "somewhere" into tmp
+    shutil.copy(bootscript_location, fp_)
+    return fp_
+
+
 def _install(mpt):
     '''
     Determine whether salt-minion is installed and, if not,
@@ -203,9 +223,12 @@ def _install(mpt):
     '''
 
     _check_resolv(mpt)
+
+    bootscript_location = prep_bootstrap_for_chroot_(mpt, salt.syspaths.BOOTSTRAP)
+
     # Exec the chroot command
     cmd = 'if type salt-minion; then exit 0; '
-    cmd += 'else sh {0} -c /tmp; fi'.format(salt.syspaths.BOOTSTRAP)
+    cmd += 'else sh {0} -c /tmp; fi'.format(bootscript_location)
     return not __salt__['cmd.run_chroot'](mpt, cmd, python_shell=True)['retcode']
 
 
